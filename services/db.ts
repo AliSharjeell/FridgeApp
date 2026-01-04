@@ -6,6 +6,7 @@ export interface Item {
     name: string;
     image_url: string;
     quantity: number;
+    status: 'draft' | 'confirmed';
 }
 
 export const db = SQLite.openDatabaseSync("kitchen.db");
@@ -17,7 +18,8 @@ export const initDB = async () => {
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         image_url TEXT,
-        quantity INTEGER
+        quantity INTEGER,
+        status TEXT DEFAULT 'draft'
       );
       CREATE TABLE IF NOT EXISTS recipes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,6 +29,14 @@ export const initDB = async () => {
         how_to_cook TEXT
       );
     `);
+        // Migration support for existing tables without status
+        try {
+            await db.execAsync("ALTER TABLE items ADD COLUMN status TEXT DEFAULT 'draft'");
+        } catch (e) {
+            // Include a comment or log for ignored error
+            console.log("Column 'status' likely exists or error adding it:", e);
+        }
+
         console.log("DB initialized");
     } catch (error) {
         console.log("DB init error", error);
@@ -37,7 +47,7 @@ export const initDB = async () => {
 export const addItem = async (name: string, quantity: number, image_url: string = "") => {
     try {
         await db.runAsync(
-            "INSERT INTO items (name, quantity, image_url) VALUES (?, ?, ?)",
+            "INSERT INTO items (name, quantity, image_url, status) VALUES (?, ?, ?, 'draft')",
             [name, quantity, image_url]
         );
         console.log(`Added item: ${name}`);
@@ -47,12 +57,40 @@ export const addItem = async (name: string, quantity: number, image_url: string 
     }
 };
 
-export const getItems = async (): Promise<Item[]> => {
+export const getItems = async (status: 'draft' | 'confirmed'): Promise<Item[]> => {
     try {
-        const result = await db.getAllAsync<Item>("SELECT * FROM items");
+        const result = await db.getAllAsync<Item>("SELECT * FROM items WHERE status = ?", [status]);
         return result;
     } catch (error) {
         console.error("Error getting items:", error);
         return [];
+    }
+};
+
+export const updateItemStatus = async (id: number, status: 'draft' | 'confirmed') => {
+    try {
+        await db.runAsync("UPDATE items SET status = ? WHERE id = ?", [status, id]);
+    } catch (error) {
+        console.error("Error updating status:", error);
+        throw error;
+    }
+};
+
+export const confirmAllItems = async () => {
+    try {
+        await db.runAsync("UPDATE items SET status = 'confirmed' WHERE status = 'draft'");
+    } catch (error) {
+        console.error("Error confirming all items:", error);
+        throw error;
+    }
+};
+
+export const deleteItem = async (id: number) => {
+    try {
+        await db.runAsync("DELETE FROM items WHERE id = ?", [id]);
+        console.log(`Deleted item id: ${id}`);
+    } catch (error) {
+        console.error("Error deleting item:", error);
+        throw error;
     }
 };

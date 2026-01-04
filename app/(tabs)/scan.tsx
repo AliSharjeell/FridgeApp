@@ -1,13 +1,17 @@
+import { useImagePreview } from "@/context/ImagePreviewContext";
 import { addItem } from "@/services/db";
 import { sendImageToGemini } from "@/services/gemini";
 import { searchItemImage } from "@/services/imageSearch";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
 import { ActivityIndicator, Alert, Button, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
+  const router = useRouter();
+  const { setPreviewImage } = useImagePreview();
   const [zoom, setZoom] = useState(0);
   const [photo, setPhoto] = useState<string | null>(null);
   const [aiResponse, setAiResponse] = useState<string>("");
@@ -106,6 +110,13 @@ export default function ScanScreen() {
               </ScrollView>
               <View style={styles.previewControls}>
                 <Button title={saving ? "Saving..." : "Save to Fridge"} onPress={saveItems} disabled={saving} />
+                <View style={{ width: 10 }} />
+                <Button title="Preview on Home" onPress={() => {
+                  if (photo) {
+                    setPreviewImage(photo);
+                    router.push('/');
+                  }
+                }} disabled={saving} />
                 <View style={{ width: 10 }} />
                 <Button title="Retake" onPress={() => { setPhoto(null); setAiResponse(""); }} disabled={saving} />
               </View>

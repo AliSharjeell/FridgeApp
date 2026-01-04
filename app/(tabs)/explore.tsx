@@ -1,112 +1,123 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Collapsible } from '@/components/ui/collapsible';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { getItems, Item } from '@/services/db';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function TabTwoScreen() {
+  const [items, setItems] = useState<Item[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadItems();
+    }, [])
+  );
+
+  const loadItems = async () => {
+    const data = await getItems('confirmed');
+    setItems(data);
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Sexplore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <ScrollView style={styles.container}>
+      <Text style={styles.appTitle}>Global Properties 🌎</Text>
+
+      <View style={styles.cardPrimary}>
+        <Text style={styles.cardTitle}>Inventory</Text>
+        <Text style={styles.cardSubtitle}>
+          All your confirmed items
+        </Text>
+      </View>
+
+      <View style={styles.itemsGrid}>
+        {items.map((item) => (
+          <View key={item.id} style={styles.itemCard}>
+            <Image
+              source={{ uri: item.image_url || "https://via.placeholder.com/150" }}
+              style={styles.itemImage}
+            />
+            <View style={styles.itemInfo}>
+              <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+              <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+            </View>
+          </View>
+        ))}
+        {items.length === 0 && (
+          <Text style={styles.emptyText}>Inventory is empty. Add items from Home!</Text>
+        )}
+      </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: "#FAFAFA",
+    padding: 20,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    gap: 8,
+  appTitle: {
+    fontSize: 28,
+    fontWeight: "600",
+    color: "#111",
+    marginBottom: 24,
+    marginTop: 20,
+  },
+  cardPrimary: {
+    backgroundColor: "#2196F3", // Blue for Inventory
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+  },
+  cardTitle: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: "white",
+    marginBottom: 4,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    color: "rgba(255,255,255,0.8)",
+  },
+  itemsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  itemCard: {
+    width: "48%",
+    backgroundColor: "white",
+    borderRadius: 16,
+    overflow: "hidden",
+    elevation: 2,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    marginBottom: 4,
+  },
+  itemImage: {
+    width: "100%",
+    height: 120,
+    resizeMode: "cover",
+  },
+  itemInfo: {
+    padding: 10,
+  },
+  itemName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+  },
+  itemQuantity: {
+    fontSize: 14,
+    color: "#666",
+  },
+  emptyText: {
+    color: "#888",
+    fontStyle: "italic",
+    width: "100%",
+    textAlign: "center",
+    marginTop: 20,
   },
 });
