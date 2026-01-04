@@ -1,98 +1,139 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
-
+import { Ionicons } from "@expo/vector-icons";
+import { useState } from "react";
+import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 export default function HomeScreen() {
+    const [saved, setSaved] = useState(false);
+      const [edit, setEdit] = useState(false);
+const [items, setItems] = useState("View detected ingredients");
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <View style={styles.container}>
+      {/* Header */}
+      <Text style={styles.appTitle}>FridgeScan 🧊</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      {/* Scan Section */}
+      <View style={styles.cardPrimary}>
+        <Text style={styles.cardTitle}>Scan</Text>
+        <Text style={styles.cardSubtitle}>
+          Take a photo of your fridge or food
+        </Text>
+      </View>
+
+      {/* Items Section */}
+      <View style={styles.cardRow}>
+        {/* Left content */}
+        <View>
+          <Text style={styles.cardTitle}>Items</Text>
+          {edit ? (
+            <>
+              <TextInput
+                value={items}
+                onChangeText={setItems}
+                style={styles.cardSubtitleInput}
+              />
+            </>
+          ) : (
+            <>
+              <Text style={styles.cardSubtitle}>{items}</Text>
+            </>
+          )}
+        </View>
+
+        {/* Save button */}
+        <View
+          style={{
+            flexDirection: "row",
+            gap: 6,
+          }}
+        >
+          <Pressable onPress={() => setEdit(!edit)}>
+            <Ionicons
+              name="pencil"
+              size={24}
+              color={edit ? "#4CAF50" : "#666"}
+            />
+          </Pressable>
+          <Pressable onPress={() => setSaved(!saved)}>
+            <Ionicons
+              name={saved ? "bookmark" : "bookmark-outline"}
+              size={24}
+              color={saved ? "#4CAF50" : "#666"}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Recipes Section */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Recipes</Text>
+        <Text style={styles.cardSubtitle}>Get meal ideas from your items</Text>
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#FAFAFA",
+    padding: 20,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  cardTitleInput: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#111",
+    marginBottom: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    paddingVertical: 2,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  cardSubtitleInput: {
+    fontSize: 14,
+    color: "#666",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ccc",
+    paddingVertical: 2,
+  },
+
+  appTitle: {
+    fontSize: 28,
+    fontWeight: "600",
+    color: "#111",
+    marginBottom: 24,
+  },
+
+  cardPrimary: {
+    backgroundColor: "#4CAF50",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+  },
+
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+  },
+
+  cardTitle: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: "#111",
+    marginBottom: 4,
+  },
+
+  cardRow: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  cardSubtitle: {
+    fontSize: 14,
+    color: "#666",
   },
 });
