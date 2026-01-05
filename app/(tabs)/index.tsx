@@ -34,17 +34,32 @@ import "../../global.css";
 export default function HomeScreen() {
   const { previewImage, setPreviewImage } = useImagePreview();
   const [items, setItems] = useState<Item[]>([]);
+  const [wholeInventory, setWholeInventory] = useState<Item[]>([]);
+    const [modalVisible, setModalVisible] = useState(false);
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemQuantity, setNewItemQuantity] = useState("1");
+  const [adding, setAdding] = useState(false);
+  const [isOn, setIsOn] = useState(false);
+  const [suggestedMeals, setSuggestedMeals] = useState<Recipe[]>([]);
 
   useFocusEffect(
     useCallback(() => {
       loadItems();
+      loadConfirmedInventory();
     }, [])
   );
   useEffect(() => {
-    if (items.length === 0) return;
+    const sourceItems = isOn ? wholeInventory : items;
+    if (sourceItems.length === 0) {
+      setSuggestedMeals([]); // Clear suggestions if source is empty
+      return;
+    }
 
     const run = async () => {
-      const ingredientNames = items.map((i) => i.name.trim().toLowerCase());
+      
+      const ingredientNames = sourceItems.map((i) =>
+        i.name.trim().toLowerCase()
+      );
       const recipes = await suggestRecipesFromGroq(ingredientNames);
       console.log("recipes");
       console.log(recipes);
@@ -55,11 +70,15 @@ export default function HomeScreen() {
     };
 
     run();
-  }, [items]);
+  }, [items, isOn]);
 
   const loadItems = async () => {
     const data = await getItems("draft");
     setItems(data);
+  };
+  const loadConfirmedInventory = async () => {
+    const data = await getItems("confirmed");
+    setWholeInventory(data);
   };
 
   const handleConfirmItem = async (id: number) => {
@@ -93,12 +112,7 @@ export default function HomeScreen() {
   // ... (Manual Add State logic remains same, ensure handleAddItem calls loadItems at end)
 
   // Manual Add State
-  const [modalVisible, setModalVisible] = useState(false);
-  const [newItemName, setNewItemName] = useState("");
-  const [newItemQuantity, setNewItemQuantity] = useState("1");
-  const [adding, setAdding] = useState(false);
-  const [isOn, setIsOn] = useState(false);
-  const [suggestedMeals, setSuggestedMeals] = useState<Recipe[]>([]);
+
 
   const handleAddItem = async () => {
     if (!newItemName.trim()) {
@@ -312,79 +326,72 @@ export default function HomeScreen() {
         </View>
 
         {/* Recipes Section */}
-        <View style={[styles.card, { marginTop: 20 }]}>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ fontSize: 28, fontWeight: "bold", color: "blue" }}>
-              Recipes
-            </Text>
-            <Switch
-              value={isOn}
-              onValueChange={setIsOn}
-              trackColor={{ true: "#ff0000", false: "#ccc" }}
-              thumbColor={isOn ? "#fff" : "#f4f3f4"}
-            />
+        <View style={[styles.headercard, { marginTop: 20 }]}>
+          <View style={styles.headerRow}>
+            <Text style={styles.sectionTitle}>Recipes</Text>
+            <View style={styles.toggleContainer}>
+              <Text style={styles.toggleLabel}>
+                {isOn ? "Whole Pantry" : "New Items Only"}
+              </Text>
+              <Switch
+                value={isOn}
+                onValueChange={setIsOn}
+                trackColor={{ true: "#2196F3", false: "#ccc" }} // Blue is usually better for "On" than Red
+                thumbColor="#fff"
+              />
+            </View>
           </View>
+
           <Text style={styles.cardSubtitle}>
-            Get meal ideas from your items
+            {isOn
+              ? "AI is using your entire inventory to find meals."
+              : "AI is only looking at the items you just added."}
           </Text>
         </View>
         <View style={{ marginTop: 20, marginBottom: 20 }}>
-          <Text style={{ fontSize: 24, fontWeight: "bold", color: "red" }}>
-            Recipes
-          </Text>
           <View>
             {suggestedMeals.map((item, i) => (
-              <View
-                key={i}
-                style={{
-                  flexDirection: "row",
-                  marginBottom: 12,
-                  backgroundColor: "#fff",
-                  padding: 8,
-                  borderRadius: 8,
-                  shadowColor: "#000",
-                  shadowOffset: { width: 0, height: 1 },
-                  shadowOpacity: 0.1,
-                  shadowRadius: 2,
-                  elevation: 2,
-                }}
-              >
-                {/* Image */}
-                {item.image_url && (
+              <View style={styles.card}>
+                {/* Image with a better aspect ratio */}
+                {item.image_url ? (
                   <Image
                     source={{ uri: item.image_url }}
-                    style={{ width: 120, height: 80, borderRadius: 8 }}
+                    style={styles.image}
                   />
+                ) : (
+                  <View style={[styles.image, styles.placeholder]}>
+                    <Ionicons name="fast-food-outline" size={32} color="#ccc" />
+                  </View>
                 )}
 
-                {/* Text */}
-                <View style={{ marginLeft: 12, flex: 1 }}>
-                  <Text style={{ fontWeight: "bold", fontSize: 16 }}>
-                    {item.name}
-                  </Text>
-                  <Text>{item.ingredients.join(", ")}</Text>
-
-                  {/* Save Button */}
-                  <TouchableOpacity
-                    onPress={() => saveRecipe(item)}
-                    style={{
-                      marginTop: 8,
-                      backgroundColor: "#ff6347",
-                      paddingVertical: 4,
-                      paddingHorizontal: 12,
-                      borderRadius: 6,
-                    }}
-                  >
-                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
-                      Save
+                <View style={styles.content}>
+                  <View style={styles.header}>
+                    <Text style={styles.title} numberOfLines={1}>
+                      {item.name}
                     </Text>
-                  </TouchableOpacity>
+                    {/* Heart icon for saving is more intuitive than a bulky button */}
+                    <TouchableOpacity
+                      onPress={() => saveRecipe(item)}
+                      style={styles.saveIcon}
+                    >
+                      <Ionicons
+                        name="bookmark-outline"
+                        size={22}
+                        color="#ff6347"
+                      />
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text style={styles.label}>INGREDIENTS</Text>
+                  <Text style={styles.ingredients} numberOfLines={2}>
+                    {item.ingredients.join(" • ")}
+                  </Text>
+
+                  <View style={styles.footer}>
+                    <Text style={styles.matchText}>
+                      ✨ Matches your inventory
+                    </Text>
+                  </View>
                 </View>
               </View>
             ))}
@@ -462,6 +469,71 @@ const styles = StyleSheet.create({
     backgroundColor: "#FAFAFA",
     padding: 20,
   },
+  card: {
+    flexDirection: "row",
+    marginBottom: 16,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    overflow: "hidden", // Clips image to border radius
+    borderWidth: 1,
+    borderColor: "#F0F0F0",
+    // Clean shadow
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  image: {
+    width: 110,
+    height: 110, // Square images usually look better in rows
+  },
+  placeholder: {
+    backgroundColor: "#F9F9F9",
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  content: {
+    flex: 1,
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  title: {
+    fontSize: 17,
+    fontWeight: "700",
+    color: "#1A1A1A",
+    flex: 1,
+    marginRight: 8,
+  },
+  saveIcon: {
+    marginTop: -2,
+  },
+  label: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#A0A0A0",
+    letterSpacing: 0.5,
+    marginTop: 4,
+  },
+  ingredients: {
+    fontSize: 13,
+    color: "#666",
+    lineHeight: 18,
+    marginTop: 2,
+  },
+  footer: {
+    marginTop: 8,
+  },
+  matchText: {
+    fontSize: 11,
+    color: "#4CAF50",
+    fontWeight: "600",
+  },
   appTitle: {
     fontSize: 28,
     fontWeight: "600",
@@ -469,13 +541,38 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     marginTop: 20,
   },
+  toggleLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#666",
+    textTransform: "uppercase",
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  toggleContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  toggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F0F7FF", // Light blue background to make it stand out
+    padding: 12,
+    borderRadius: 12,
+    marginTop: 10,
+  },
   cardPrimary: {
     backgroundColor: "#4CAF50",
     borderRadius: 20,
     padding: 20,
     marginBottom: 24,
   },
-  card: {
+  headercard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 20,
@@ -573,7 +670,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: "center",
   },
-  label: {
+  headerlabel: {
     fontSize: 16,
     marginBottom: 8,
     fontWeight: "500",
