@@ -4,9 +4,12 @@ import {
   confirmAllItems,
   deleteItem,
   getItems,
-  Item,
+  saveRecipe,
   updateItemStatus,
 } from "@/services/db";
+import { Item, Recipe } from "@/types";
+
+import { suggestRecipesFromGroq } from "@/services/getRecipes";
 import { searchItemImage } from "@/services/imageSearch";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "expo-router";
@@ -14,7 +17,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Image,
   Modal,
   ScrollView,
@@ -27,11 +29,7 @@ import {
 } from "react-native";
 import "../../global.css";
 
-type Recipe = {
-  name: string;
-  ingredients: string[];
-  image?: string; // optional, will fetch from Pexels
-};
+
 
 export default function HomeScreen() {
   const { previewImage, setPreviewImage } = useImagePreview();
@@ -42,6 +40,22 @@ export default function HomeScreen() {
       loadItems();
     }, [])
   );
+  useEffect(() => {
+    if (items.length === 0) return;
+
+    const run = async () => {
+      const ingredientNames = items.map((i) => i.name.trim().toLowerCase());
+      const recipes = await suggestRecipesFromGroq(ingredientNames);
+      console.log("recipes");
+      console.log(recipes);
+      setSuggestedMeals(recipes);
+      const recipesWithImages = await attachImages(recipes);
+      setSuggestedMeals(recipesWithImages);
+      console.log(recipesWithImages);
+    };
+
+    run();
+  }, [items]);
 
   const loadItems = async () => {
     const data = await getItems("draft");
@@ -95,12 +109,12 @@ export default function HomeScreen() {
     try {
       setAdding(true);
       // 1. Get Image
-      const imageUrl = await searchItemImage(newItemName);
+      const image_url = await searchItemImage(newItemName);
 
       // 2. Add to DB
       const qty = parseInt(newItemQuantity) || 1;
-      await addItem(newItemName, qty, imageUrl);
-      
+      await addItem(newItemName, qty, image_url);
+
       // 3. Cleanup
       setNewItemName("");
       setNewItemQuantity("1");
@@ -119,8 +133,8 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
-    console.log("Items changed, detected by recipe")
-    console.log(items)
+    console.log("Items changed, detected by recipe");
+    console.log(items);
     if (items.length > 0) {
       (async () => {
         const recipesWithImages = await suggestRandomRecipe(items);
@@ -128,6 +142,16 @@ export default function HomeScreen() {
       })();
     }
   }, [items]);
+  const attachImages = async (recipes: Recipe[]): Promise<Recipe[]> => {
+    if (recipes.length == 0) return [];
+    const recipesWithImages = await Promise.all(
+      recipes.map(async (recipe) => {
+        const image_url = await searchItemImage(recipe.name);
+        return { ...recipe, image_url: image_url };
+      })
+    );
+    return recipesWithImages;
+  };
 
   const suggestRandomRecipe = async (items: Item[]): Promise<Recipe[]> => {
     const availableNames = items.map((i) => i.name.toLowerCase());
@@ -149,8 +173,8 @@ export default function HomeScreen() {
 
     const recipesWithImages = await Promise.all(
       possibleRecipes.map(async (recipe) => {
-        const imageUrl = await searchItemImage(recipe.name);
-        return { ...recipe, image: imageUrl };
+        const image_url = await searchItemImage(recipe.name);
+        return { ...recipe, image_url: image_url };
       })
     );
     return recipesWithImages;
@@ -314,20 +338,13 @@ export default function HomeScreen() {
           <Text style={{ fontSize: 24, fontWeight: "bold", color: "red" }}>
             Recipes
           </Text>
-          <FlatList
-            data={suggestedMeals}
-            keyExtractor={(item, index) => index.toString()}
-            numColumns={2} // This makes it 2-column
-            columnWrapperStyle={{
-              justifyContent: "space-between",
-              marginBottom: 16,
-            }}
-            renderItem={({ item }) => (
+          <View>
+            {suggestedMeals.map((item, i) => (
               <View
+                key={i}
                 style={{
-                  flex: 1, // Important: lets it take half the width
-                  marginHorizontal: 4,
-                  alignItems: "center",
+                  flexDirection: "row",
+                  marginBottom: 12,
                   backgroundColor: "#fff",
                   padding: 8,
                   borderRadius: 8,
@@ -338,27 +355,40 @@ export default function HomeScreen() {
                   elevation: 2,
                 }}
               >
-                <Text style={{ fontSize: 18, fontWeight: "bold" }}>
-                  {item.name}
-                </Text>
-                <Text style={{ marginTop: 4, fontSize: 14 }}>
-                  Ingredients: {item.ingredients.join(", ")}
-                </Text>
-                {item.image && (
+                {/* Image */}
+                {item.image_url && (
                   <Image
-                    source={{ uri: item.image }}
-                    style={{
-                      width: "100%",
-                      height: 100,
-                      borderRadius: 8,
-                      marginTop: 8,
-                    }}
-                    resizeMode="cover"
+                    source={{ uri: item.image_url }}
+                    style={{ width: 120, height: 80, borderRadius: 8 }}
                   />
                 )}
+
+                {/* Text */}
+                <View style={{ marginLeft: 12, flex: 1 }}>
+                  <Text style={{ fontWeight: "bold", fontSize: 16 }}>
+                    {item.name}
+                  </Text>
+                  <Text>{item.ingredients.join(", ")}</Text>
+
+                  {/* Save Button */}
+                  <TouchableOpacity
+                    onPress={() => saveRecipe(item)}
+                    style={{
+                      marginTop: 8,
+                      backgroundColor: "#ff6347",
+                      paddingVertical: 4,
+                      paddingHorizontal: 12,
+                      borderRadius: 6,
+                    }}
+                  >
+                    <Text style={{ color: "#fff", fontWeight: "bold" }}>
+                      Save
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            )}
-          />
+            ))}
+          </View>
         </View>
       </ScrollView>
 

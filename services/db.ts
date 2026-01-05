@@ -1,13 +1,6 @@
+import { Item, Recipe } from "@/types";
 import * as SQLite from "expo-sqlite";
 
-
-export interface Item {
-    id: number;
-    name: string;
-    image_url: string;
-    quantity: number;
-    status: 'draft' | 'confirmed';
-}
 
 export const db = SQLite.openDatabaseSync("kitchen.db");
 
@@ -43,6 +36,37 @@ export const initDB = async () => {
         throw error;
     }
 };
+// services/db.ts
+export const saveRecipe = (recipe: Recipe) => {
+  const ingredientsStr = recipe.ingredients.join(", ");
+  try {
+    db.runAsync(
+      `INSERT INTO recipes (name, image_url, ingredients, how_to_cook) VALUES (?, ?, ?, ?)`,
+      [
+        recipe.name,
+        recipe.image_url || "",
+        ingredientsStr,
+        recipe.how_to_cook || "",
+      ]
+    );
+    console.log("Recipe saved:", recipe.name);
+  } catch (error) {
+    console.error("Error saving recipe:", error);
+  }
+};
+export const getRecipes = async (
+): Promise<Recipe[]> => {
+  try {
+    const result = await db.getAllAsync<Recipe>(
+      "SELECT * FROM recipes"
+    );
+    return result;
+  } catch (error) {
+    console.error("Error getting recipes:", error);
+    return [];
+  }
+};
+
 
 export const addItem = async (name: string, quantity: number, image_url: string = "") => {
     try {
