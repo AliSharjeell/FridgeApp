@@ -7,7 +7,7 @@ import {
   saveRecipe,
   updateItemStatus,
 } from "@/services/db";
-import { Item, Recipe } from "@/types";
+import { Item, RecipeTemp } from "@/types";
 
 import { suggestRecipesFromGroq } from "@/services/getRecipes";
 import { searchItemImage } from "@/services/imageSearch";
@@ -40,7 +40,7 @@ export default function HomeScreen() {
   const [newItemQuantity, setNewItemQuantity] = useState("1");
   const [adding, setAdding] = useState(false);
   const [isOn, setIsOn] = useState(false);
-  const [suggestedMeals, setSuggestedMeals] = useState<Recipe[]>([]);
+  const [suggestedMeals, setSuggestedMeals] = useState<RecipeTemp[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -156,7 +156,7 @@ export default function HomeScreen() {
       })();
     }
   }, [items]);
-  const attachImages = async (recipes: Recipe[]): Promise<Recipe[]> => {
+  const attachImages = async (recipes: RecipeTemp[]): Promise<RecipeTemp[]> => {
     if (recipes.length == 0) return [];
     const recipesWithImages = await Promise.all(
       recipes.map(async (recipe) => {
@@ -167,7 +167,7 @@ export default function HomeScreen() {
     return recipesWithImages;
   };
 
-  const suggestRandomRecipe = async (items: Item[]): Promise<Recipe[]> => {
+  const suggestRandomRecipe = async (items: Item[]): Promise<RecipeTemp[]> => {
     const availableNames = items.map((i) => i.name.toLowerCase());
     // Example simple recipe pool
     const recipes = [

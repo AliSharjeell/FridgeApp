@@ -1,4 +1,4 @@
-import { Item, Recipe } from "@/types";
+import { Item, Recipe, RecipeTemp } from "@/types";
 import * as SQLite from "expo-sqlite";
 
 
@@ -37,7 +37,7 @@ export const initDB = async () => {
     }
 };
 // services/db.ts
-export const saveRecipe = (recipe: Recipe) => {
+export const saveRecipe = (recipe: RecipeTemp) => {
   const ingredientsStr = recipe.ingredients.join(", ");
   try {
     db.runAsync(
@@ -93,11 +93,59 @@ export const getItems = async (status: 'draft' | 'confirmed'): Promise<Item[]> =
 
 export const updateItemStatus = async (id: number, status: 'draft' | 'confirmed') => {
     try {
-        await db.runAsync("UPDATE items SET status = ? WHERE id = ?", [status, id]);
+      // 1. Get the details of the item we are about to confirm
+      const draftItem = await db.getFirstAsync<{
+        name: string;
+        quantity: number;
+      }>("SELECT name, quantity FROM items WHERE id = ?", [id]);
+
+      // not confirmed hi sahi, lekin hoga zaroor
+      if (!draftItem) return;
+
+      // 2. Check if a 'confirmed' item with the same name already exists
+      const existingItem = await db.getFirstAsync<{
+        id: number;
+        quantity: number;
+      }>(
+        "SELECT id, quantity FROM items WHERE LOWER(name) = LOWER(?) AND status = 'confirmed' LIMIT 1",
+        [draftItem.name]
+      );
+
+      if (existingItem) {
+        // 3. COLLAPSE: Update the existing item's quantity and delete the draft
+        await db.runAsync(
+          "UPDATE items SET quantity = quantity + ? WHERE id = ?",
+          [draftItem.quantity, existingItem.id]
+        );
+        await db.runAsync("DELETE FROM items WHERE id = ?", [id]);
+        console.log(`Merged ${draftItem.name} into existing entry.`);
+      }else{
+        // 4. NO MATCH: Just confirm it normally
+        await db.runAsync(
+          "UPDATE items SET status = 'confirmed' WHERE id = ?",
+          [id]
+        );
+        console.log(`Added ${draftItem.name} into inventory, new entry.`);
+      }
+
     } catch (error) {
         console.error("Error updating status:", error);
         throw error;
     }
+};
+export const updateItemQuantity = async (
+  id: number,
+  quantity: number
+) => {
+  try {
+    await db.runAsync("UPDATE items SET quantity = ? WHERE id = ?", [
+      quantity,
+      id,
+    ]);
+  } catch (error) {
+    console.error("Error updating quantity:", error);
+    throw error;
+  }
 };
 
 export const confirmAllItems = async () => {
@@ -117,4 +165,14 @@ export const deleteItem = async (id: number) => {
         console.error("Error deleting item:", error);
         throw error;
     }
+};
+
+export const deleteRecipe = async (id: number) => {
+  try {
+    await db.runAsync("DELETE FROM recipes WHERE id = ?", [id]);
+    console.log(`Deleted recipe id: ${id}`);
+  } catch (error) {
+    console.error("Error deleting recipe:", error);
+    throw error;
+  }
 };
