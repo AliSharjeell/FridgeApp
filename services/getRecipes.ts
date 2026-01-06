@@ -29,9 +29,10 @@ Suggest 3 simple recipes.
 Rules:
 - Return ONLY valid JSON
 - No explanations
+- No backticks
 - Format:
 [
-  { "name": "Recipe name", "ingredients": ["ingredient1", "ingredient2"] }
+  { "name": "Recipe name", "ingredients": ["ingredient1", "ingredient2"], "how_to_cook": "Step 1..." }
 ]
 `;
 
