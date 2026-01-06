@@ -1,56 +1,89 @@
 import { useImagePreview } from "@/context/ImagePreviewContext";
 import { addItem } from "@/services/db";
-import { sendImageToGemini } from "@/services/gemini";
+import { sendImageToGroq } from "@/services/groqImage";
 import { searchItemImage } from "@/services/imageSearch";
+import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import { useRouter } from "expo-router";
 import { useRef, useState } from "react";
-import { ActivityIndicator, Alert, Button, Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Button,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+
+// 1. Define the interface for your scanned items
+interface ScannedItem {
+  name: string;
+  quantity: number | string;
+}
 
 export default function ScanScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const router = useRouter();
   const { setPreviewImage } = useImagePreview();
+
   const [zoom, setZoom] = useState(0);
   const [photo, setPhoto] = useState<string | null>(null);
-  const [aiResponse, setAiResponse] = useState<string>("");
+
+  // 2. Properly type the state to avoid the 'never' error
+  const [aiResponse, setAiResponse] = useState<ScannedItem[]>([]);
+
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  if (!permission) {
-    // Camera permissions are still loading.
-    return <View />;
-  }
+  if (!permission) return <View />;
 
   if (!permission.granted) {
-    // Camera permissions are not granted yet.
     return (
       <View style={styles.container}>
-        <Text style={styles.message}>We need your permission to show the camera</Text>
+        <Text style={styles.message}>
+          We need your permission to show the camera
+        </Text>
         <Button onPress={requestPermission} title="grant permission" />
       </View>
     );
   }
 
   const takePicture = async () => {
-    console.log("Attempting to take picture...");
     if (cameraRef.current) {
       try {
-        console.log("Calling takePictureAsync...");
-        const photoData = await cameraRef.current.takePictureAsync({ base64: true, quality: 0.5 });
-        console.log("takePictureAsync result:", photoData?.uri); // Log URI, don't log full base64
+        const photoData = await cameraRef.current.takePictureAsync({
+          base64: true,
+          quality: 0.5,
+        });
+
         if (photoData && photoData.base64) {
           setPhoto(photoData.uri);
-          console.log("Photo captured:", photoData.uri);
           setLoading(true);
+
           try {
-            const result = await sendImageToGemini(photoData.base64);
-            console.log("Gemini result:", result);
-            setAiResponse(result);
+            const result = await sendImageToGroq(photoData.base64);
+
+            // 3. Clean Markdown before parsing (AI often wraps JSON in ```json blocks)
+            const cleanJson = result
+              .replace(/```json/g, "")
+              .replace(/```/g, "")
+              .trim();
+            const parsedData = JSON.parse(cleanJson);
+
+            // 4. Extract array and save to state
+            const items = (parsedData.items || parsedData) as ScannedItem[];
+            setAiResponse(Array.isArray(items) ? items : []);
           } catch (error) {
-            console.error("Gemini error:", error);
-            setAiResponse("Error analyzing image.");
+            console.error("Groq analysis error:", error);
+            Alert.alert(
+              "Analysis Failed",
+              "Could not read the items in the image."
+            );
+            setAiResponse([]);
           } finally {
             setLoading(false);
           }
@@ -58,36 +91,35 @@ export default function ScanScreen() {
       } catch (error) {
         console.error("Failed to take picture:", error);
       }
-    } else {
-      console.warn("Camera ref is null");
     }
   };
 
   const saveItems = async () => {
+    if (aiResponse.length === 0) return;
+
     try {
       setSaving(true);
-      // Clean up the response text - remove markdown code blocks if present
-      const cleanJson = aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();
 
-      const items = JSON.parse(cleanJson);
-
-      if (!Array.isArray(items)) {
-        throw new Error("Invalid response format: expected an array");
-      }
-
-      for (const item of items) {
+      // 5. Logic Fixed: No more .replace() or JSON.parse() here!
+      // aiResponse is already a clean array of objects.
+      for (const item of aiResponse) {
         const imageUrl = await searchItemImage(item.name);
-        // Ensure quantity is a number, parse it if it's a string like "3"
-        const qty = typeof item.quantity === 'string' ? parseInt(item.quantity) || 1 : item.quantity;
+
+        // Ensure quantity is a valid number
+        const qty =
+          typeof item.quantity === "string"
+            ? parseInt(item.quantity) || 1
+            : item.quantity;
+
         await addItem(item.name, qty, imageUrl);
       }
 
       Alert.alert("Success", "Items saved to your fridge!");
       setPhoto(null);
-      setAiResponse("");
+      setAiResponse([]);
     } catch (error) {
       console.error("Error saving items:", error);
-      Alert.alert("Error", "Failed to save items. Please try again.");
+      Alert.alert("Error", "Failed to save items.");
     } finally {
       setSaving(false);
     }
@@ -98,30 +130,59 @@ export default function ScanScreen() {
       {photo ? (
         <View style={styles.previewContainer}>
           <Image source={{ uri: photo }} style={styles.preview} />
-          {loading ? (
+
+          {loading && (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#ffffff" />
-              <Text style={styles.loadingText}>Analyzing...</Text>
+              <Text style={styles.loadingText}>Analyzing Items...</Text>
             </View>
-          ) : aiResponse ? (
-            <View style={{ flex: 1 }}>
+          )}
+
+          {!loading && aiResponse.length > 0 && (
+            <View style={styles.overlayWrapper}>
               <ScrollView style={styles.responseContainer}>
-                <Text style={styles.responseText}>{aiResponse}</Text>
+                <Text style={styles.listHeader}>Items Found:</Text>
+                {aiResponse.map((item, index) => (
+                  <View key={index} style={styles.itemRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.itemName}>{item.name}</Text>
+                      <Text style={styles.itemQuantity}>
+                        Quantity: {item.quantity}
+                      </Text>
+                    </View>
+                    <Ionicons
+                      name="checkmark-circle"
+                      size={22}
+                      color="#4CAF50"
+                    />
+                  </View>
+                ))}
               </ScrollView>
+
               <View style={styles.previewControls}>
-                <Button title={saving ? "Saving..." : "Save to Fridge"} onPress={saveItems} disabled={saving} />
-                <View style={{ width: 10 }} />
-                <Button title="Preview on Home" onPress={() => {
-                  if (photo) {
-                    setPreviewImage(photo);
-                    router.push('/');
-                  }
-                }} disabled={saving} />
-                <View style={{ width: 10 }} />
-                <Button title="Retake" onPress={() => { setPhoto(null); setAiResponse(""); }} disabled={saving} />
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.saveButton]}
+                  onPress={saveItems}
+                  disabled={saving}
+                >
+                  <Text style={styles.buttonText}>
+                    {saving ? "Saving..." : "Save to Fridge"}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.retakeButton]}
+                  onPress={() => {
+                    setPhoto(null);
+                    setAiResponse([]);
+                  }}
+                  disabled={saving}
+                >
+                  <Text style={styles.buttonText}>Retake</Text>
+                </TouchableOpacity>
               </View>
             </View>
-          ) : null}
+          )}
         </View>
       ) : (
         <CameraView
@@ -130,20 +191,28 @@ export default function ScanScreen() {
           ref={cameraRef}
           mode="picture"
           zoom={zoom}
-          onCameraReady={() => console.log("Camera ready")}
-          onMountError={(e) => console.error("Camera mount error:", e)}
         >
           <View style={styles.controlsContainer}>
             <View style={styles.zoomControls}>
-              <TouchableOpacity onPress={() => setZoom(Math.max(0, zoom - 0.1))} style={styles.zoomButton}>
+              <TouchableOpacity
+                onPress={() => setZoom(Math.max(0, zoom - 0.1))}
+                style={styles.zoomButton}
+              >
                 <Text style={styles.zoomText}>-</Text>
               </TouchableOpacity>
-              <Text style={styles.zoomText}>{(zoom * 10).toFixed(1)}x</Text>
-              <TouchableOpacity onPress={() => setZoom(Math.min(1, zoom + 0.1))} style={styles.zoomButton}>
+              <Text style={styles.zoomText}>{(zoom * 10 + 1).toFixed(1)}x</Text>
+              <TouchableOpacity
+                onPress={() => setZoom(Math.min(1, zoom + 0.1))}
+                style={styles.zoomButton}
+              >
                 <Text style={styles.zoomText}>+</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
+
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={takePicture}
+            >
               <View style={styles.captureButtonInner} />
             </TouchableOpacity>
           </View>
@@ -154,20 +223,50 @@ export default function ScanScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
+  container: { flex: 1, backgroundColor: "#000" },
+  camera: { flex: 1 },
+  message: { textAlign: "center", color: "white" },
+
+  // Preview / Analysis UI
+  previewContainer: { flex: 1 },
+  preview: { flex: 1, resizeMode: "cover" },
+  overlayWrapper: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: "50%",
+    backgroundColor: "rgba(0,0,0,0.7)",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 10,
   },
-  message: {
-    textAlign: "center",
-    paddingBottom: 10,
+  responseContainer: { paddingHorizontal: 20 },
+  listHeader: {
+    color: "white",
+    fontSize: 18,
+    fontWeight: "bold",
+    marginBottom: 10,
   },
-  camera: {
-    flex: 1,
+  itemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.1)",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 8,
   },
+  itemName: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "600",
+    textTransform: "capitalize",
+  },
+  itemQuantity: { color: "#bbb", fontSize: 14 },
+
+  // Controls
   controlsContainer: {
     flex: 1,
-    backgroundColor: "transparent",
     justifyContent: "flex-end",
     alignItems: "center",
     marginBottom: 40,
@@ -176,23 +275,18 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginBottom: 20,
     alignItems: "center",
-    backgroundColor: "rgba(0,0,0,0.5)",
-    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.6)",
+    borderRadius: 25,
     padding: 10,
   },
-  zoomButton: {
-    paddingHorizontal: 20,
-  },
-  zoomText: {
-    color: "white",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
+  zoomButton: { paddingHorizontal: 20 },
+  zoomText: { color: "white", fontSize: 18, fontWeight: "bold" },
   captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: "rgba(255, 255, 255, 0.5)",
+    width: 75,
+    height: 75,
+    borderRadius: 40,
+    borderWidth: 4,
+    borderColor: "white",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -202,49 +296,33 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     backgroundColor: "white",
   },
-  previewContainer: {
-    flex: 1,
-    backgroundColor: "black",
-  },
-  preview: {
-    flex: 1,
-    resizeMode: "contain",
-  },
+
   previewControls: {
-    padding: 20,
     flexDirection: "row",
-    justifyContent: "center",
-    backgroundColor: "#1a1a1a",
-  },
-  text: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "white",
-  },
-  responseContainer: {
     padding: 20,
-    backgroundColor: "#1a1a1a",
-    maxHeight: 200,
+    gap: 10,
   },
-  responseText: {
-    color: "white",
-    fontSize: 16,
+  actionButton: {
+    flex: 1,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
   },
+  saveButton: { backgroundColor: "#4CAF50" },
+  retakeButton: { backgroundColor: "#FF3B30" },
+  buttonText: { color: "white", fontWeight: "bold", fontSize: 16 },
+
   loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    zIndex: 10,
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     color: "white",
-    marginTop: 10,
+    marginTop: 15,
     fontSize: 18,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
 });
