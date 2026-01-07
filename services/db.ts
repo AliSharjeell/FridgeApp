@@ -148,6 +148,17 @@ export const updateItemQuantity = async (
   }
 };
 
+export const updateItemName = async (id: number, name: string) => {
+  try {
+    await db.runAsync("UPDATE items SET name = ? WHERE id = ?", [
+      name,
+      id,
+    ]);
+  } catch (error) {
+    console.error("Error updating name:", error);
+    throw error;
+  }
+};
 export const confirmAllItems = async () => {
     try {
         await db.runAsync("UPDATE items SET status = 'confirmed' WHERE status = 'draft'");

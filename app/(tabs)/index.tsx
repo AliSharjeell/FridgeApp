@@ -11,7 +11,7 @@ import { Item, RecipeTemp } from "@/types";
 import { suggestRecipesFromGroq } from "@/services/getRecipes";
 import { searchItemImage } from "@/services/imageSearch";
 import { Ionicons } from "@expo/vector-icons";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const [adding, setAdding] = useState(false);
   const [isOn, setIsOn] = useState(false);
   const [suggestedMeals, setSuggestedMeals] = useState<RecipeTemp[]>([]);
-  const [recipeCount, setRecipeCount] = useState(3)
+  const [recipeCount, setRecipeCount] = useState(3) // component stays mounted hence when we change tabs, use state persists
 
   useFocusEffect(
     useCallback(() => {
@@ -182,8 +182,21 @@ export default function HomeScreen() {
 
           {previewImage && (
             <View style={{ marginBottom: 20 }}>
-              <Image source={{ uri: previewImage }} style={{ width: '100%', height: 200, borderRadius: 12 }} />
-              <TouchableOpacity onPress={() => setPreviewImage(null)} style={{ position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(0,0,0,0.5)', padding: 5, borderRadius: 20 }}>
+              <Image
+                source={{ uri: previewImage }}
+                style={{ width: "100%", height: 200, borderRadius: 12 }}
+              />
+              <TouchableOpacity
+                onPress={() => setPreviewImage(null)}
+                style={{
+                  position: "absolute",
+                  top: 10,
+                  right: 10,
+                  backgroundColor: "rgba(0,0,0,0.5)",
+                  padding: 5,
+                  borderRadius: 20,
+                }}
+              >
                 <Ionicons name="close" size={20} color="white" />
               </TouchableOpacity>
             </View>
@@ -211,7 +224,21 @@ export default function HomeScreen() {
                   />
 
                   {/* Edit Button inside Box */}
-                  <TouchableOpacity style={styles.editOverlay}>
+                  <TouchableOpacity
+                    style={styles.editOverlay}
+                    onPress={() =>
+                      router.push({
+                        pathname: "/item/[id]",
+                        params: {
+                          id: item.id,
+                          name: item.name,
+                          image_url: item.image_url,
+                          quantity: item.quantity,
+                          status: item.status,
+                        },
+                      })
+                    }
+                  >
                     <Ionicons name="pencil" size={12} color="#333" />
                     <Text style={styles.editText}>Edit</Text>
                   </TouchableOpacity>
@@ -283,10 +310,20 @@ export default function HomeScreen() {
                 </View>
 
                 <View style={styles.recipeContent}>
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                    }}
+                  >
                     <Text style={styles.recipeTitle}>{item.name}</Text>
                     <TouchableOpacity onPress={() => saveRecipe(item)}>
-                      <Ionicons name="bookmark-outline" size={24} color="#1A1A1A" />
+                      <Ionicons
+                        name="bookmark-outline"
+                        size={24}
+                        color="#1A1A1A"
+                      />
                     </TouchableOpacity>
                   </View>
 
@@ -299,7 +336,10 @@ export default function HomeScreen() {
 
             {/* View More Button */}
             {suggestedMeals.length > 0 && (
-              <TouchableOpacity style={styles.viewMoreButton} onPress={() => setRecipeCount(recipeCount + 3)}>
+              <TouchableOpacity
+                style={styles.viewMoreButton}
+                onPress={() => setRecipeCount(recipeCount + 3)}
+              >
                 <Text style={styles.viewMoreText}>View More</Text>
               </TouchableOpacity>
             )}
