@@ -38,6 +38,7 @@ export default function HomeScreen() {
   const [adding, setAdding] = useState(false);
   const [isOn, setIsOn] = useState(false);
   const [suggestedMeals, setSuggestedMeals] = useState<RecipeTemp[]>([]);
+  const [recipeCount, setRecipeCount] = useState(3)
 
   useFocusEffect(
     useCallback(() => {
@@ -57,7 +58,7 @@ export default function HomeScreen() {
       const ingredientNames = sourceItems.map((i) =>
         i.name.trim().toLowerCase()
       );
-      const recipes = await suggestRecipesFromGroq(ingredientNames);
+      const recipes = await suggestRecipesFromGroq(ingredientNames, recipeCount);
       console.log("recipes", recipes);
       // setSuggestedMeals(recipes); // Wait for images
       const recipesWithImages = await attachImages(recipes);
@@ -65,7 +66,7 @@ export default function HomeScreen() {
     };
 
     run();
-  }, [items, isOn]);
+  }, [items, isOn, recipeCount]);
 
   const loadItems = async () => {
     const data = await getItems("draft");
@@ -118,14 +119,14 @@ export default function HomeScreen() {
     }
   };
 
-  useEffect(() => {
-    if (items.length > 0) {
-      (async () => {
-        const recipesWithImages = await suggestRandomRecipe(items);
-        setSuggestedMeals(recipesWithImages);
-      })();
-    }
-  }, [items]);
+  // useEffect(() => {
+  //   if (items.length > 0) {
+  //     (async () => {
+  //       const recipesWithImages = await suggestRandomRecipe(items);
+  //       setSuggestedMeals(recipesWithImages);
+  //     })();
+  //   }
+  // }, [items]);
 
   const attachImages = async (recipes: RecipeTemp[]): Promise<RecipeTemp[]> => {
     if (recipes.length == 0) return [];
@@ -298,7 +299,7 @@ export default function HomeScreen() {
 
             {/* View More Button */}
             {suggestedMeals.length > 0 && (
-              <TouchableOpacity style={styles.viewMoreButton}>
+              <TouchableOpacity style={styles.viewMoreButton} onPress={() => setRecipeCount(recipeCount + 3)}>
                 <Text style={styles.viewMoreText}>View More</Text>
               </TouchableOpacity>
             )}

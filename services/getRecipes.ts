@@ -11,7 +11,7 @@ const MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"; // fast + cheap
  * Suggest recipes based on available ingredients
  */
 export async function suggestRecipesFromGroq(
-  ingredients: string[]
+  ingredients: string[], count?: number
 ): Promise<Recipe[]> {
   if (!GROQ_API_KEY) {
     console.warn("Groq API key missing");
@@ -24,7 +24,7 @@ You are a helpful cooking assistant.
 Given these available ingredients:
 ${ingredients.join(", ")}
 
-Suggest 3 simple recipes.
+Suggest ${count?count:3} simple recipes.
 
 Rules:
 - Return ONLY valid JSON
